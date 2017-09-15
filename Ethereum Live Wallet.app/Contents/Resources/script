@@ -1,0 +1,43 @@
+#!/usr/bin/ruby
+require 'json'
+require 'net/http'
+require 'openssl'
+address = []
+tmp_address_cont = {}
+address_cont = {}
+api = 'http://api.etherscan.io/api?module=account&action=balancemulti&tag=latest&address='
+username = ENV['USER']
+def c_format(n)
+	return n.to_s.reverse.scan(/\d{1,3}/).join(",").reverse
+end
+path="/Users/#{username}/Library/Ethereum/keystore/*"
+Dir[path].each do |file_name|
+	cont = File.open(file_name, "rb").read
+	cont_json = JSON.parse(cont)
+    w_add = cont_json['address']
+	address.push(w_add)
+	tmp_address_cont[w_add] = cont_json
+end
+puts "#{address.length} Ether Wallets Found"
+r = Net::HTTP.get(URI("#{api}#{address.join(",")}"))
+data = JSON.parse(r)
+data['result'].each do |vl|
+	balance = vl['balance'].to_i
+	c_account = vl['account']
+	if(balance > 0)
+		tmp_address_cont[c_account]['raw_balance'] = balance
+		address_cont[c_account] = tmp_address_cont[c_account]
+	end
+end
+address.each do |vl|
+	c_account = vl
+	if(address_cont[vl])
+		balance = address_cont[vl]['raw_balance'].to_s
+		balance = balance.rjust(19, '0')
+		balance = "#{c_format(balance[0, balance.length - 18])}.#{balance[-18, balance.length].to_s.sub(/0+$/,'')}"
+	else
+		balance = 0
+	end
+	puts "#{c_account} --> #{balance} ETH"
+end
+
